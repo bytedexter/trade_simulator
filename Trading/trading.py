@@ -1,20 +1,24 @@
 import os
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import Flask, request, jsonify
 from pymongo import MongoClient
 import yfinance as yf
-from bson.objectid import ObjectId
 from dotenv import load_dotenv
 from bson.errors import InvalidId
+from bson import ObjectId, errors
+from flask_cors import CORS
+
+app = Flask(__name__)
+CORS(app)
+
 # Load environment variables from .env file (create one in your working directory)
 load_dotenv()
 
 def get_database():
     # CONNECTION_STRING = os.getenv('')  # Set your MongoDB connection string in .env
     client = MongoClient("mongodb+srv://enbodyAdmin:O0r1MK2YLQ7QPkec@atlascluster.mz70pny.mongodb.net/")
-    print(client)
     return client['IEM-CEDS-STOCK-TRADING']
 
 db = get_database()
@@ -22,9 +26,6 @@ db = get_database()
 # Collections
 users_col = db['USERS']
 gtt_book_col = db['GTT_BOOK']
-
-# Flask App Initialization
-app = Flask(__name__)
 
 # Helper Function to Fetch Stock Data
 def fetch_stock_data(ticker):
@@ -35,7 +36,7 @@ def fetch_stock_data(ticker):
 
     latest_data = stock_info.iloc[-1]
     current_price = latest_data['Close']
-    fetch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    fetch_time = datetime.now(timezone.utc)
 
     data = {
         'fetch_time': fetch_time,
@@ -44,6 +45,8 @@ def fetch_stock_data(ticker):
     return data
 
 # Route to Receive GTT Order Data
+
+
 @app.route('/add_gtt_order', methods=['POST'])
 def add_gtt_order():
     data = request.get_json()
@@ -52,28 +55,38 @@ def add_gtt_order():
     trigger_price = data.get('trigger_price')
     quantity = data.get('quantity')
 
-    if not all([user_id, stock_symbol, trigger_price]):
+    if not all([user_id, stock_symbol, trigger_price, quantity]):
         return jsonify({'error': 'Missing required fields'}), 400
 
-    # Validate user_id
-    if not users_col.find_one({'_id': ObjectId(user_id)}):
-        return jsonify({'error': 'Invalid user_id'}), 400
+    # Validate and convert user_id to ObjectId
+    try:
+        user_obj_id = ObjectId(user_id)
+    except errors.InvalidId:
+        return jsonify({'error': 'Invalid user_id format. It must be a 24-character hex string.'}), 400
+
+    # Check if the user exists in the database
+    if not users_col.find_one({'_id': user_obj_id}):
+        return jsonify({'error': 'User not found'}), 404
 
     # Create GTT Order
     gtt_order = {
-        'user_id': ObjectId(user_id),
+        'user_id': user_obj_id,
         'stock_symbol': stock_symbol,
-        'quantity': quantity,
+        'quantity': int(quantity),
         'trigger_price': float(trigger_price),
-        'created_at': datetime.now()
+        'created_at': datetime.utcnow()  # Use UTC for consistent time across systems
     }
 
     gtt_book_col.insert_one(gtt_order)
     return jsonify({'message': 'GTT order added successfully'}), 201
 
+
 # Background Worker to Monitor GTT Orders
+
 def gtt_order_worker():
+    count =0
     while True:
+        count = count + 1
         # Fetch all GTT orders
         gtt_orders = list(gtt_book_col.find())
 
@@ -116,10 +129,13 @@ def gtt_order_worker():
                         # Check if stock already exists in holdings
                         for holding in stock_holdings:
                             if holding['stock_symbol'] == stock_symbol:
-                                holding['quantity'] += quantity
-                                holding['purchase_price'] = current_price  # Assuming latest purchase price
-                                holding['purchase_date'] = datetime.now()
-                                break
+                                if holding['purchase_price']==current_price:
+                                    holding['quantity'] += quantity
+                                    holding['purchase_price'] = current_price  # Assuming latest purchase price
+                                    holding['purchase_date'] = datetime.now()
+                                    break
+                                else:
+                                    break
                         else:
                             # Add new stock holding
                             stock_holdings.append({
@@ -148,6 +164,8 @@ def gtt_order_worker():
                     print(f"User {user_id} not found.")
 
         # Sleep for a defined interval before checking again
+        
+        print("Iteration Count: ", count)
         time.sleep(1)  # Check every 60 seconds
 
 # Start Background Worker Thread

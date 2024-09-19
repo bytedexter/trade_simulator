@@ -110,14 +110,16 @@ const userProfile = asyncHandler(async (req, res) => {
 
 const updatePortfolio = asyncHandler(async (req, res) => {
   try {
-    const { email, intraday_holdings, cash_holding } = req.body;
+    const { email, intraday_holdings, cash_holding, stock_holdings, transaction_history } = req.body;
 
     const user = await User.findOneAndUpdate(
       { email },
       {
         $set: {
           'intraday_holdings.intraday_buy': intraday_holdings,
-          'cash_holding.cash_in_hand': cash_holding
+          'cash_holding.cash_in_hand': cash_holding,
+          'stock_holdings': stock_holdings,
+          'transaction_history': transaction_history
         }
       },
       { new: true }
@@ -133,10 +135,51 @@ const updatePortfolio = asyncHandler(async (req, res) => {
     res.status(constants.INTERNAL_SERVER_ERROR).json({ message: 'Internal server error' });
   }
 });
+
+const resetPortfolio = asyncHandler(async (req, res) => {
+  const { email } = req.body; // Get the user's email from the request body
+
+  // Default values for resetting the portfolio
+  const resetPortfolio = {
+    cash_holding: {
+      cash_in_hand: 10000000, // Reset to initial cash value, e.g., 10 million
+      intraday_profit_loss: 0
+    },
+    intraday_holdings: {
+      intraday_buy: 0,
+      intraday_sell: 0
+    },
+    stock_holdings: [], // Clear all stock holdings
+    transaction_history: [],
+    stock_holdings:[] // Clear transaction history
+  };
+
+  try {
+    // Find the user by email and update their portfolio with reset values
+    const result = await User.findOneAndUpdate(
+      { email: email },
+      { $set: resetPortfolio },
+      { new: true } // Return the updated document
+    );
+
+    if (!result) {
+      res.status(404).json({ error: 'User not found' });
+    } else {
+      res.json({ message: 'Portfolio reset successfully', user: result });
+    }
+  } catch (err) {
+    console.error('Error resetting portfolio:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
 const Sign_out = asyncHandler(async (req, res) => {
   // Invalidate the token on the client side
   res.status(200).json({ message: "User signed out successfully" });
 });
+
+
 
 module.exports = {
   Sign_up,
@@ -144,4 +187,5 @@ module.exports = {
   Sign_out,
   userProfile,
   updatePortfolio,
+  resetPortfolio
 };
