@@ -78,11 +78,38 @@ function fetchData(ticker, timeframe, emaPeriod, rsiPeriod) {
 
 // Fetch default data on page load
 const tickerInput = document.getElementById('ticker');
+
+function getUrlParams() {
+    const params = {};
+    window.location.search.substr(1).split("&").forEach(function(item) {
+        const pair = item.split("=");
+        if (pair[0]) {
+            params[pair[0]] = decodeURIComponent(pair[1]);
+        }
+    });
+    return params;
+}
+
+let userDetails = null;
 window.addEventListener('load', () => {
+    const urlParams = getUrlParams();
+    if (urlParams.user) {
+        try {
+            userDetails = JSON.parse(urlParams.user);
+            console.log('User details retrieved from URL:', userDetails);
+        } catch (error) {
+            console.error('Error parsing user details from URL:', error);
+            userDetails = null;
+        }
+    } else {
+        console.warn('No user details found in URL parameters.');
+    }
+
+    // Fetch default stock data
     fetchData('WIPRO.NS', '1d', 20, 14);
     tickerInput.value = 'WIPRO.NS';
     loadWatchlist();
-});
+})
 
 // Handle data fetching on button click
 document.getElementById('fetchData').addEventListener('click', () => {
@@ -338,12 +365,16 @@ document.querySelector('[data-modal-toggle="crud-modal"]').addEventListener('cli
         const symbol = document.getElementById('ticker').value;
         fetchAndSetModalBuyPrice(symbol);
     }
+    else if (priceOption === 'trigger') {
+        const symbol = document.getElementById('ticker').value;
+        fetchAndSetModalBuyPrice(symbol);
+    }
 });
 
 // Handle form submission in the modal
 document.getElementById('buyForm').addEventListener('submit', function(event) {
     event.preventDefault();
-    const quantity = parseInt(document.getElementById('modalQuantity').value, 10);
+    const quantity = document.getElementById('modalQuantity').value;
     const tradeType = document.getElementById('modalTradeType').value;
     const priceOption = document.querySelector('input[name="priceOption"]:checked').value;
     let buyPrice = parseFloat(document.getElementById('modalBuyPrice').value);
@@ -390,7 +421,7 @@ document.getElementById('buyForm').addEventListener('submit', function(event) {
 // Function to update the portfolio
 function updatePortfolio(symbol, quantity, price, tradeType) {
     // Extract user details from localStorage or other means
-    const userDetails = getUserDetails(); // Implement this function based on how you store user data
+     // Implement this function based on how you store user data
 
     if (!userDetails) {
         document.getElementById('feedback').innerText = 'User details not found. Please log in.';
@@ -417,9 +448,6 @@ function updatePortfolio(symbol, quantity, price, tradeType) {
         return;
     }
 
-    // Update user details
-    userDetails.cash_holding.cash_in_hand = newCashInHand;
-    userDetails.intraday_holdings.intraday_buy = newIntradayBuy;
 
     // Send the updated user details to the backend to update the database
     fetch('http://localhost:8000/api/users/update-portfolio', {
@@ -431,8 +459,8 @@ function updatePortfolio(symbol, quantity, price, tradeType) {
         },
         body: JSON.stringify({
             email: userDetails.email,
-            intraday_holdings: userDetails.intraday_holdings,
-            cash_holding: userDetails.cash_holding
+            intraday_holdings: newIntradayBuy,
+            cash_holding: newCashInHand
         })
     })
     .then(updateResponse => updateResponse.json())
@@ -455,13 +483,6 @@ function updatePortfolio(symbol, quantity, price, tradeType) {
     });
 }
 
-// Function to get user details
-function getUserDetails() {
-    // Implement based on how you store user data
-    // For example, if user data is stored in localStorage:
-    const userDetails = JSON.parse(localStorage.getItem('userDetails'));
-    return userDetails;
-}
 
 // Handle theme toggle (if needed)
 document.getElementById('themeToggle').addEventListener('click', function () {
