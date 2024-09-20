@@ -557,7 +557,7 @@ document.getElementById("buyForm").addEventListener("submit", function (event) {
 });
 
 // Handle form submission in the sell modal
-document.getElementById('sellForm').addEventListener('submit', function(event) {
+/* document.getElementById('sellForm').addEventListener('submit', function(event) {
   event.preventDefault();
 
   const ticker = document.getElementById('sellTicker').value.trim();
@@ -613,7 +613,7 @@ async function sellStock(orderData) {
     document.getElementById('feedback').innerText = `Error placing sell order: ${error.message}`;
   }
 }
-
+ */
 // Function to update the portfolio
 function updatePortfolio(symbol, quantity, price, tradeType) {
   // Extract user details from localStorage or other means
@@ -717,7 +717,7 @@ function updatePortfolio(symbol, quantity, price, tradeType) {
         // Display a success message on the page
         document.getElementById(
           "feedback"
-        ).innerText = `Successfully bought ${quantity} shares of ${stockSymbol} at $${price.toFixed(
+        ).innerText = `Successfully bought ${quantity} shares of ${symbol} at $${price.toFixed(
           2
         )} each.`;
         // Update userDetails in localStorage

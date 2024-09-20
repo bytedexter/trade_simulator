@@ -69,6 +69,14 @@ const userSchema = new mongoose.Schema(
           type: Number,
           required: true,
         },
+        totalCost:{
+          type:Number,
+          required:true,
+        },
+        purchase_date:{
+          type: Date,
+          required: true,
+        },
         timestamp: {
           type: Date,
           default: Date.now,

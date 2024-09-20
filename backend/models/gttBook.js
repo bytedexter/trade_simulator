@@ -1,25 +1,34 @@
-import { Schema, model } from 'mongoose';
+import { Schema, model } from "mongoose";
 
-const gttBookSchema = new Schema({
-    user_id: [{
+const gttBookSchema = new Schema(
+  {
+    user_id: [
+      {
         type: Schema.Types.ObjectId,
-        ref: 'User',
-        required: true,
-        unique: true
-    }],
-    stock_symbol: {
-        type: String,
+        ref: "User",
         required: true,
         unique: true,
+      },
+    ],
+    stock_symbol: {
+      type: String,
+      required: true,
+      unique: true,
     },
     trigger_price: {
-        type: Number,
-        required: true,
-        unique: true
+      type: Number,
+      required: true,
+      unique: true,
     },
-    }, {
-    timestamps: true
-})
+    order_type: {
+      type: String,
+      required: true,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
 
-const gttBook = model('GTT_Book', gttBookSchema, "GTT_BOOK");
+const gttBook = model("GTT_Book", gttBookSchema, "GTT_BOOK");
 export default gttBook;
