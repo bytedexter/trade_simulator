@@ -346,7 +346,7 @@ tickerInput.addEventListener("input", () => {
   }
 });
 
-// Function to fetch and set the market price in the modal
+// Function to fetch and set the market price in the buy modal
 function fetchAndSetModalBuyPrice(symbol) {
   fetch(`/api/${symbol}`)
     .then((response) => response.json())
@@ -354,8 +354,8 @@ function fetchAndSetModalBuyPrice(symbol) {
       if (data.market_price) {
         const modalBuyPrice = document.getElementById("modalBuyPrice");
         if (modalBuyPrice) {
-          modalBuyPrice.value = data.market_price;
-          console.log("Price fetched and set in modal");
+          modalBuyPrice.value = data.market_price; // Set the fetched price in buy modal
+          console.log("Price fetched and set in buy modal");
         } else {
           console.error("modalBuyPrice element not found");
         }
@@ -366,19 +366,39 @@ function fetchAndSetModalBuyPrice(symbol) {
     .catch((error) => console.error("Error fetching stock price:", error));
 }
 
-// Event listener for price option change in the modal
+// Function to fetch and set the market price in the sell modal
+function fetchAndSetModalSellPrice(symbol) {
+  fetch(`/api/${symbol}`)
+    .then((response) => response.json())
+    .then((data) => {
+      if (data.market_price) {
+        const modalSellPrice = document.getElementById("modalSellPrice");
+        if (modalSellPrice) {
+          modalSellPrice.value = data.market_price; // Set the fetched price in sell modal
+          console.log("Price fetched and set in sell modal");
+        } else {
+          console.error("modalSellPrice element not found");
+        }
+      } else {
+        console.error("Error fetching stock price:", data.error);
+      }
+    })
+    .catch((error) => console.error("Error fetching stock price:", error));
+}
+
+// Event listener for price option change in the buy modal
 function handlePriceOptionChange() {
   const priceOption = document.querySelector(
     'input[name="priceOption"]:checked'
   ).value;
   const modalBuyPrice = document.getElementById("modalBuyPrice");
   if (priceOption === "market") {
-    // Fetch and set the current market price
+    // Fetch and set the current market price in buy modal
     const symbol = document.getElementById("ticker").value;
     fetchAndSetModalBuyPrice(symbol);
     modalBuyPrice.readOnly = true;
   } else {
-    // Allow user to input a trigger price
+    // Allow user to input a trigger price in buy modal
     modalBuyPrice.value = "";
     modalBuyPrice.readOnly = false;
   }
@@ -391,7 +411,33 @@ document
   .getElementById("triggerPriceOption")
   .addEventListener("change", handlePriceOptionChange);
 
-// Initialize modal when it's opened
+// Event listener for price option change in the sell modal
+function handleSellPriceOptionChange() {
+  const priceOption = document.querySelector(
+    'input[name="sellPriceOption"]:checked'
+  ).value;
+  const modalSellPrice = document.getElementById("modalSellPrice");
+
+  if (priceOption === "market") {
+    // Fetch and set the current market price in sell modal
+    const symbol = document.getElementById("ticker").value;
+    fetchAndSetModalSellPrice(symbol);
+    modalSellPrice.readOnly = true;
+  } else {
+    // Allow user to input a trigger price in sell modal
+    modalSellPrice.value = "";
+    modalSellPrice.readOnly = false;
+  }
+}
+
+document
+  .getElementById("marketSellPriceOption")
+  .addEventListener("change", handleSellPriceOptionChange);
+document
+  .getElementById("triggerSellPriceOption")
+  .addEventListener("change", handleSellPriceOptionChange);
+
+// Initialize buy modal when it's opened
 document
   .querySelector('[data-modal-toggle="crud-modal"]')
   .addEventListener("click", () => {
@@ -407,7 +453,23 @@ document
     }
   });
 
-// Handle form submission in the modal
+// Initialize sell modal when it's opened
+document
+  .querySelector('[data-modal-toggle="crud-modal-2"]')
+  .addEventListener("click", () => {
+    const priceOption = document.querySelector(
+      'input[name="sellPriceOption"]:checked'
+    ).value;
+    if (priceOption === "market") {
+      const symbol = document.getElementById("ticker").value;
+      fetchAndSetModalSellPrice(symbol);
+    } else if (priceOption === "trigger") {
+      const symbol = document.getElementById("ticker").value;
+      fetchAndSetModalSellPrice(symbol);
+    }
+  });
+
+// Handle form submission in the buy modal
 document.getElementById("buyForm").addEventListener("submit", function (event) {
   event.preventDefault();
   const quantity = document.getElementById("modalQuantity").value;
@@ -494,18 +556,68 @@ document.getElementById("buyForm").addEventListener("submit", function (event) {
   document.querySelector('[data-modal-toggle="crud-modal"]').click();
 });
 
+// Handle form submission in the sell modal
+document.getElementById('sellForm').addEventListener('submit', function(event) {
+  event.preventDefault();
+
+  const ticker = document.getElementById('sellTicker').value.trim();
+  const quantity = parseInt(document.getElementById('modalSellQuantity').value);
+  const orderType = document.getElementById('modalSellTradeType').value;
+  const priceOption = document.querySelector(
+    'input[name="sellPriceOption"]:checked'
+  ).value;
+  let sellPrice = parseFloat(document.getElementById("modalSellPrice").value);
+
+  if (isNaN(quantity) || quantity <= 0) {
+    document.getElementById('feedback').innerText = 'Please enter a valid quantity';
+    return;
+  }
+
+  if (priceOption === "market") {
+    fetch(`/api/${symbol}`)
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.market_price) {
+          buyPrice = data.market_price;
+          // Proceed to update the portfolio
+          updatePortfolio(symbol, quantity, buyPrice, tradeType);
+        }
+      })
+      .catch((error) => {
+        console.error("Error fetching stock price:", error);
+        document.getElementById("feedback").innerText =
+          "Error fetching stock price";
+      });
+  }
+})
+
+// Function to place a sell order
+async function sellStock(orderData) {
+  try {
+    const response = await fetch('http://127.0.0.1:5001/sell_stock', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(orderData)
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const successMessage = await response.json();
+    document.getElementById('feedback').innerText = `Successfully placed ${orderData.shorting === 'yes' ? 'short sell' : 'sell'} order for ${orderData.quantity} shares of ${orderData.stock_symbol}.`;
+  } catch (error) {
+    console.error('Error placing sell order:', error);
+    document.getElementById('feedback').innerText = `Error placing sell order: ${error.message}`;
+  }
+}
+
 // Function to update the portfolio
 function updatePortfolio(symbol, quantity, price, tradeType) {
   // Extract user details from localStorage or other means
   // Implement this function based on how you store user data
-  if (tradeType == "GTT_order") {
-    document.getElementById(
-      "feedback"
-    ).innerText = `Successfully placed GTT_order of ${quantity} shares of ${stockSymbol} at $${price.toFixed(
-      2
-    )} each.`;
-    return;
-  }
   if (!userDetails) {
     document.getElementById("feedback").innerText =
       "User details not found. Please log in.";

@@ -95,6 +95,7 @@ def get_stock_price(symbol):
         ticker = yf.Ticker(symbol)
         data = ticker.history()
         market_price = data['Close'].iloc[-1]
+        market_price = round(market_price, 2)
         return jsonify({'symbol': symbol, 'market_price': market_price})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -103,6 +104,7 @@ def get_stock_price(symbol):
 def company(symbol):
     ticker = yf.Ticker(symbol)
     return ticker.info.get('longName', 'NaN')
+
 
 if __name__ == '__main__':
     app.run(debug=True)

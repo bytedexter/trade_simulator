@@ -1,13 +1,18 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import StockCard from './StockCard'; // Assuming you have a StockCard component
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import StockCard from './StockCard';
 import axios from 'axios';
+import { ChevronLeft, ChevronRight, Home, Briefcase, List, TrendingUp, Newspaper, BookOpen, User, LogOut } from 'lucide-react';
 
 const Dashboard = () => {
-  const [userDetails, setUserDetails] = useState([]); // Store user details here
-  const [loading, setLoading] = useState(true); // Track loading state
+  const [userDetails, setUserDetails] = useState([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(5);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   useEffect(() => {
     const fetchUserDetails = async () => {
@@ -17,12 +22,12 @@ const Dashboard = () => {
             Authorization: `Bearer ${localStorage.getItem('authToken')}`,
           },
         });
-        console.log('User details:', response.data); // Log response for debugging
-        setUserDetails(response.data); // Store data in state
-        setLoading(false); // Stop loading once data is fetched
+        console.log('User details:', response.data);
+        setUserDetails(response.data);
+        setLoading(false);
       } catch (error) {
         console.error('Error fetching user details:', error);
-        setLoading(false); // Stop loading if an error occurs
+        setLoading(false);
       }
     };
 
@@ -30,54 +35,129 @@ const Dashboard = () => {
   }, []);
 
   if (loading) {
-    return <p>Loading user data...</p>; // Display loading state
+    return <p>Loading user data...</p>;
   }
 
-  // if (!userDetails) {
-  //   return <p>No user data available. Please try again later.</p>; // Handle null or empty state
-  // }
   const logout = () => {
-    localStorage.removeItem('authToken');// Remove accessToken from localStorage
-    console.clear() 
-    navigate('/'); // Redirect to login page
+    localStorage.removeItem('authToken');
+    console.clear();
+    navigate('/');
   };
 
-  return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-gray-100">
-      <aside className="w-full md:w-1/5 bg-blue-600 text-white p-6">
-        <nav>
-          <ul>
-            <motion.li whileHover={{ scale: 1.05 }} className="mb-4">
-              <Link to="/dashboard" className="hover:text-gray-300">Dashboard</Link>
-            </motion.li>
-            <motion.li whileHover={{ scale: 1.05 }} className="mb-4">
-              <Link to="/portfolio" className="hover:text-gray-300">Portfolio</Link>
-            </motion.li>
-            <motion.li whileHover={{ scale: 1.05 }} className="mb-4">
-              <Link to="/watchlist" className="hover:text-gray-300">Watchlist</Link>
-            </motion.li>
-            <motion.li whileHover={{ scale: 1.05 }} className="mb-4 font-extrabold">
-              <Link to="/trading" className="hover:text-gray-300">TRADING</Link>
-            </motion.li>
-            <motion.li whileHover={{ scale: 1.05 }} className="mb-4">
-              <Link to="/news" className="hover:text-gray-300">News</Link>
-            </motion.li>
-            <motion.li whileHover={{ scale: 1.05 }} className="mb-4">
-              <Link to="/learn" className="hover:text-gray-300">Learn</Link>
-            </motion.li>
-            <motion.li whileHover={{ scale: 1.05 }} className="mb-4">
-              <Link to="/profile" className="hover:text-gray-300">Profile</Link>
-            </motion.li>
-            <motion.li whileHover={{ scale: 1.05 }} className="mb-4">
-              <button onClick={logout} className="hover:text-gray-300">Log Out</button>
-            </motion.li>
-          </ul>
-        </nav>
-      </aside>
+  const transactionHistory = [
+    { id: 1, stockShort: 'AAPL', stockName: 'Apple Inc.', stockPrice: 150.25, type: 'intraday', quantity: 10 },
+    { id: 2, stockShort: 'GOOGL', stockName: 'Alphabet Inc.', stockPrice: 2750.80, type: 'delivery', quantity: 5 },
+    { id: 3, stockShort: 'MSFT', stockName: 'Microsoft Corporation', stockPrice: 300.50, type: 'intraday', quantity: 15 },
+    { id: 4, stockShort: 'AMZN', stockName: 'Amazon.com, Inc.', stockPrice: 3302.75, type: 'delivery', quantity: 2 },
+    { id: 5, stockShort: 'FB', stockName: 'Meta Platforms, Inc.', stockPrice: 324.90, type: 'intraday', quantity: 8 },
+    { id: 6, stockShort: 'TSLA', stockName: 'Tesla, Inc.', stockPrice: 735.60, type: 'delivery', quantity: 3 },
+    { id: 7, stockShort: 'NVDA', stockName: 'NVIDIA Corporation', stockPrice: 220.75, type: 'intraday', quantity: 12 },
+    { id: 8, stockShort: 'JPM', stockName: 'JPMorgan Chase & Co.', stockPrice: 150.30, type: 'delivery', quantity: 7 },
+  ];
 
-      <main className="flex-1 p-6">
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentTransactions = transactionHistory.slice(indexOfFirstItem, indexOfLastItem);
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+  const sidebarItems = [
+    { path: '/dashboard', icon: Home, label: 'Dashboard' },
+    { path: '/portfolio', icon: Briefcase, label: 'Portfolio' },
+    { path: '/watchlist', icon: List, label: 'Watchlist' },
+    { path: '/trading', icon: TrendingUp, label: 'Trading' },
+    { path: '/news', icon: Newspaper, label: 'News' },
+    { path: '/learn', icon: BookOpen, label: 'Learn' },
+    { path: '/profile', icon: User, label: 'Profile' },
+  ];
+
+  const sidebarVariants = {
+    expanded: { width: '15rem' },
+    collapsed: { width: '6rem' },
+  };
+
+  const toggleSidebar = () => setIsExpanded(!isExpanded);
+
+  return (
+    <div className="flex bg-gray-100">
+      <motion.aside
+        initial="expanded"
+        animate={isExpanded ? 'expanded' : 'collapsed'}
+        variants={sidebarVariants}
+        transition={{ duration: 0.3 }}
+        className="bg-gradient-to-b from-blue-600 to-blue-800 text-white fixed h-screen overflow-hidden"
+      >
+        <div className="p-6 flex flex-col h-full">
+          <motion.h1
+            initial={{ opacity: 1 }}
+            animate={{ opacity: isExpanded ? 1 : 0 }}
+            transition={{ duration: 0.2 }}
+            className="text-2xl font-bold mb-8"
+          >
+            {isExpanded ? 'StockTrader Pro' : ''}
+          </motion.h1>
+          <nav className="flex-grow">
+            <ul>
+              <AnimatePresence>
+                {sidebarItems.map((item) => (
+                  <motion.li
+                    key={item.path}
+                    whileHover={{ scale: 1.05, originX: 0 }}
+                    whileTap={{ scale: 0.95 }}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.2 }}
+                    className="mb-4"
+                  >
+                    <Link
+                      to={item.path}
+                      className={`flex items-center p-2 rounded-lg transition-colors duration-200 ${
+                        location.pathname === item.path
+                          ? 'bg-blue-700 text-white'
+                          : 'text-blue-100 hover:bg-blue-700 hover:text-white'
+                      }`}
+                    >
+                      <item.icon className="w-5 h-5 mr-3" />
+                      {isExpanded && (
+                        <motion.span
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          {item.label}
+                        </motion.span>
+                      )}
+                    </Link>
+                  </motion.li>
+                ))}
+              </AnimatePresence>
+            </ul>
+          </nav>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={logout}
+            className="flex items-center p-2 rounded-lg transition-colors duration-200 text-blue-100 hover:bg-blue-700 hover:text-white w-full mt-auto"
+          >
+            <LogOut className="w-5 h-5 mr-3" />
+            {isExpanded && <span>Log Out</span>}
+          </motion.button>
+        </div>
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={toggleSidebar}
+          className="absolute top-7 right-1 bg-blue-500 text-white p-1 rounded-full"
+        >
+          {isExpanded ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+        </motion.button>
+      </motion.aside>
+
+      <main className={`flex-1 p-6 ${isExpanded ? 'ml-64' : 'ml-20'} transition-all duration-300`}>
         <h1 className="text-3xl font-bold text-gray-800 mb-6">Dashboard</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -128,6 +208,97 @@ const Dashboard = () => {
             </ul>
           </motion.div>
         </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.6 }}
+          className="bg-white rounded-lg shadow-lg p-6"
+        >
+          <h2 className="text-2xl font-bold text-gray-800 mb-6">Transaction History</h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full table-auto">
+              <thead>
+                <tr className="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
+                  <th className="py-3 px-6 text-left">S.No</th>
+                  <th className="py-3 px-6 text-left">Stock</th>
+                  <th className="py-3 px-6 text-left">Company</th>
+                  <th className="py-3 px-6 text-right">Price</th>
+                  <th className="py-3 px-6 text-center">Type</th>
+                  <th className="py-3 px-6 text-right">Quantity</th>
+                </tr>
+              </thead>
+              <tbody className="text-gray-600 text-sm">
+                <AnimatePresence>
+                  {currentTransactions.map((transaction, index) => (
+                    <motion.tr 
+                      key={transaction.id} 
+                      className="border-b border-gray-200 hover:bg-gray-50 transition duration-300"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      transition={{ duration: 0.3, delay: index * 0.1 }}
+                    >
+                      <td className="py-4 px-6 text-left whitespace-nowrap font-medium">{indexOfFirstItem + index + 1}</td>
+                      <td className="py-4 px-6 text-left whitespace-nowrap font-medium">{transaction.stockShort}</td>
+                      <td className="py-4 px-6 text-left">{transaction.stockName}</td>
+                      <td className="py-4 px-6 text-right font-medium">₹{transaction.stockPrice.toFixed(2)}</td>
+                      <td className="py-4 px-6 text-center">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          transaction.type === 'intraday' 
+                            ? 'bg-blue-100 text-blue-800' 
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {transaction.type}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6 text-right font-medium">{transaction.quantity}</td>
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-4 flex justify-between items-center">
+            <div>
+              <p className="text-sm text-gray-700">
+                Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to <span className="font-medium">{Math.min(indexOfLastItem, transactionHistory.length)}</span> of{' '}
+                <span className="font-medium">{transactionHistory.length}</span> results
+              </p>
+            </div>
+            <div>
+              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                <button
+                  onClick={() => paginate(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                >
+                  <span className="sr-only">Previous</span>
+                  <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                </button>
+                {Array.from({ length: Math.ceil(transactionHistory.length / itemsPerPage) }).map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => paginate(index + 1)}
+                    className={`relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium ${
+                      currentPage === index + 1 ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {index + 1}
+                  </button>
+                ))}
+                <button
+                  onClick={() => paginate(currentPage + 1)}
+                  disabled={currentPage === Math.ceil(transactionHistory.length / itemsPerPage)}
+                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                >
+                  <span className="sr-only">Next</span>
+                  <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                </button>
+              </nav>
+            </div>
+          </div>
+        </motion.div>
       </main>
     </div>
   );

@@ -82,9 +82,9 @@ def add_gtt_order():
 
 
 # Background Worker to Monitor GTT Orders
-
+count =0
 def gtt_order_worker():
-    count =0
+    global count
     while True:
         count = count + 1
         # Fetch all GTT orders
@@ -114,7 +114,7 @@ def gtt_order_worker():
                 continue
 
             # If current price meets or exceeds the trigger price
-            if current_price == trigger_price:
+            if current_price >= trigger_price:
                 # Update user's portfolio
                 user = users_col.find_one({'_id': user_id})
                 if user:
@@ -129,21 +129,20 @@ def gtt_order_worker():
                         # Check if stock already exists in holdings
                         for holding in stock_holdings:
                             if holding['stock_symbol'] == stock_symbol:
-                                if holding['purchase_price']==current_price:
+                                if holding['purchase_price']<=current_price:
                                     holding['quantity'] += quantity
                                     holding['purchase_price'] = current_price  # Assuming latest purchase price
-                                    holding['purchase_date'] = datetime.now()
+                                    holding['purchase_date'].append(datetime.now())
                                     break
                                 else:
                                     break
-                        else:
-                            # Add new stock holding
-                            stock_holdings.append({
-                                'stock_symbol': stock_symbol,
-                                'quantity': quantity,
-                                'purchase_price': current_price,
-                                'purchase_date': datetime.now()
-                            })
+                            else:
+                                stock_holdings.append({
+                                    'stock_symbol': stock_symbol,
+                                    'quantity': quantity,
+                                    'purchase_price': current_price,
+                                    'purchase_date': datetime.now()
+                                })
 
                         # Update the user's document
                         users_col.update_one(

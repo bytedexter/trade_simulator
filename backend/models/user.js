@@ -43,10 +43,10 @@ const userSchema = new mongoose.Schema(
           type: Number,
           required: false,
         },
-        purchase_date: {
+        purchase_date: [{
           type: Date,
           required: false,
-        },
+        }],
       },
     ],
 
