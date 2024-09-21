@@ -468,6 +468,8 @@ document
       fetchAndSetModalSellPrice(symbol);
     }
   });
+  
+
 
 // Handle form submission in the buy modal
 document.getElementById("buyForm").addEventListener("submit", function (event) {
@@ -480,18 +482,34 @@ document.getElementById("buyForm").addEventListener("submit", function (event) {
   let buyPrice = parseFloat(document.getElementById("modalBuyPrice").value);
 
   if (isNaN(quantity) || quantity <= 0) {
-    document.getElementById("feedback").innerText =
+    document.getElementById("feedback404").innerText =
       "Please enter a valid quantity";
+    document.getElementById("errorAlert").style.display = "block";
     return;
   }
 
   if (isNaN(buyPrice) || buyPrice <= 0) {
-    document.getElementById("feedback").innerText =
+    document.getElementById("feedback404").innerText =
       "Please enter a valid buy price";
+    document.getElementById("errorAlert").style.display = "block";
     return;
   }
 
   const symbol = document.getElementById("ticker").value;
+
+  // Check if the current time is before 3:30 PM IST
+  const now = new Date();
+  const istOffset = 5.5 * 60 * 60 * 1000; // IST offset in milliseconds
+  const istNow = new Date(now.getTime() + istOffset);
+  const marketCloseTime = new Date(istNow);
+  marketCloseTime.setHours(15, 30, 0, 0); // Set to 3:30 PM IST
+
+  if (istNow >= marketCloseTime) {
+    document.getElementById("feedback404").innerText =
+      "Market is closed. Cannot place order.";
+    document.getElementById("errorAlert").style.display = "";
+    return;
+  }
 
   // Fetch the market price if priceOption is 'market' to ensure accuracy
   if (priceOption === "market") {
@@ -506,12 +524,11 @@ document.getElementById("buyForm").addEventListener("submit", function (event) {
       })
       .catch((error) => {
         console.error("Error fetching stock price:", error);
-        document.getElementById("feedback").innerText =
+        document.getElementById("feedback404").innerText =
           "Error fetching stock price";
+        document.getElementById("errorAlert").style.display = "block";
       });
-  }
-  // Ensure that the else block triggers placing a GTT order
-  else {
+  } else {
     // For trigger price, use the user-entered buyPrice
     async function placeGttOrder(userDetails, symbol, quantity, buyPrice) {
       try {
@@ -525,26 +542,37 @@ document.getElementById("buyForm").addEventListener("submit", function (event) {
             user_id: userDetails._id, // Ensure _id is passed as a valid MongoDB ObjectId
             stock_symbol: symbol,
             quantity: quantity,
-            trigger_price: buyPrice, // Use the user-entered buyPrice as the trigger price
+            trigger_price: buyPrice,
+            order_type: tradeType, // Use the user-entered buyPrice as the trigger price
           }),
         });
 
         // Check if the response is not OK, and throw an error if so
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          const errorData = await response.json();
+          if (errorData.error === 'Market is closed. Cannot place GTT sell order.') {
+            document.getElementById("feedback404").innerText = errorData.error;
+            document.getElementById("errorAlert").style.display = "block";
+          } else {
+            document.getElementById("feedback404").innerText = `Failed to place GTT order for ${quantity} shares of ${symbol} at $${buyPrice.toFixed(2)} each.`;
+            document.getElementById("errorAlert").style.display = "block";
+          }
+          return;
         }
         // Display a success message in the UI
         document.getElementById(
-          "feedback"
+          "feedback404"
         ).innerText = `Successfully placed GTT order for ${quantity} shares of ${symbol} at $${buyPrice.toFixed(
           2
         )} each.`;
+        document.getElementById("errorAlert").style.display = "block";
       } catch (error) {
         // Log and display any error encountered while placing the order
         console.error("Error placing GTT order:", error);
         document.getElementById(
-          "feedback"
+          "feedback404"
         ).innerText = `Error placing GTT order: ${error.message}`;
+        document.getElementById("errorAlert").style.display = "block";
       }
     }
 
@@ -552,8 +580,16 @@ document.getElementById("buyForm").addEventListener("submit", function (event) {
     // You need to pass the correct variables: userDetails, symbol, quantity, and buyPrice
     placeGttOrder(userDetails, symbol, quantity, buyPrice);
   }
-  // Close the modal
-  document.querySelector('[data-modal-toggle="crud-modal"]').click();
+});
+
+document.querySelector('[data-modal-toggle="crud-modal"]').addEventListener("click", function () {
+  document.getElementById("errorAlert").style.display = "none";
+  document.getElementById("feedback404").innerText = "";
+});
+
+document.querySelector('[data-modal-toggle="crud-modal-2"]').addEventListener("click", function () {
+  document.getElementById("errorAlert").style.display = "none";
+  document.getElementById("feedback404").innerText = "";
 });
 
 // Handle form submission in the sell modal

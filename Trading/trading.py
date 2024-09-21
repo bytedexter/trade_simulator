@@ -1,7 +1,5 @@
 import os
 import threading
-import time
-from datetime import datetime, timezone
 from flask import Flask, request, jsonify
 from pymongo import MongoClient
 import yfinance as yf
@@ -9,6 +7,11 @@ from dotenv import load_dotenv
 from bson.errors import InvalidId
 from bson import ObjectId, errors
 from flask_cors import CORS
+from datetime import datetime, time
+import pytz
+import time as time_module  
+
+ist = pytz.timezone('Asia/Kolkata')
 
 app = Flask(__name__)
 CORS(app)
@@ -36,7 +39,7 @@ def fetch_stock_data(ticker):
 
     latest_data = stock_info.iloc[-1]
     current_price = latest_data['Close']
-    fetch_time = datetime.now(timezone.utc)
+    fetch_time = datetime.now(ist)
 
     data = {
         'fetch_time': fetch_time,
@@ -54,6 +57,11 @@ def add_gtt_order():
     stock_symbol = data.get('stock_symbol')
     trigger_price = data.get('trigger_price')
     quantity = data.get('quantity')
+    order_type = data.get('order_type')
+    now = datetime.now(ist)
+    market_close_time = time(15, 30)
+    if now.time() >= market_close_time:
+        return jsonify({'error': 'Market is closed. Cannot place GTT sell order.'}), 400
 
     if not all([user_id, stock_symbol, trigger_price, quantity]):
         return jsonify({'error': 'Missing required fields'}), 400
@@ -74,7 +82,8 @@ def add_gtt_order():
         'stock_symbol': stock_symbol,
         'quantity': int(quantity),
         'trigger_price': float(trigger_price),
-        'created_at': datetime.utcnow()  # Use UTC for consistent time across systems
+        'order_type':order_type,
+        'created_at': datetime.now(ist)  # Use UTC for consistent time across systems
     }
 
     gtt_book_col.insert_one(gtt_order)
@@ -87,8 +96,8 @@ def add_gtt_sell_order():
     stock_symbol = data.get('stock_symbol')
     trigger_price = data.get('trigger_price')
     quantity = data.get('quantity')
-    order_type = data.get('order_type', 'trigger')  # default to trigger if not specified
-
+    order_type = data.get('order_type', 'long')  # default to trigger if not specified    
+    
     if not all([user_id, stock_symbol, trigger_price, quantity]):
         return jsonify({'error': 'Missing required fields'}), 400
 
@@ -105,7 +114,7 @@ def add_gtt_sell_order():
         'stock_symbol': stock_symbol,
         'quantity': int(quantity),
         'trigger_price': float(trigger_price),
-        'created_at': datetime.utcnow(),
+        'created_at': datetime.now(ist),
         'order_type': order_type
     }
 
@@ -125,6 +134,8 @@ def gtt_order_worker():
         # Fetch unique stock symbols from GTT orders
         stock_symbols = list(set(order['stock_symbol'] for order in gtt_orders))
         
+        now = datetime.now(ist)
+        market_close_time = time(15, 30)
         # Fetch current prices for all relevant stocks
         stock_prices = {}
         for symbol in stock_symbols:
@@ -140,9 +151,10 @@ def gtt_order_worker():
             stock_symbol = order['stock_symbol']
             trigger_price = order['trigger_price']
             quantity = order['quantity']
+            order_type = order['order_type']
             current_price = stock_prices.get(stock_symbol)
             
-            if current_price and current_price >= trigger_price:
+            if (current_price and current_price >= trigger_price) or (order_type == 'intraday' and now.time() >= market_close_time):
                 # Execute the order
                 user = users_col.find_one({'_id': user_id})
                 if user:
@@ -205,7 +217,6 @@ def gtt_order_worker():
         # Sleep for a defined interval before checking again
         
         print("Iteration Count: ", count)
-        time.sleep(1)  # Check every 60 seconds
 
 # Start Background Worker Thread
 worker_thread = threading.Thread(target=gtt_order_worker, daemon=True)
@@ -250,8 +261,7 @@ def gtt_sell_order_worker():
 
                     print(f"GTT Sell Order Executed: Sold {quantity} shares of {stock_symbol} at {current_price}.")
                     gtt_sell_book_col.delete_one({'_id': order['_id']})
-
-        time.sleep(60)  # Check every minute
+  # Check every minute
 
 sell_worker_thread = threading.Thread(target=gtt_sell_order_worker, daemon=True)
 sell_worker_thread.start()

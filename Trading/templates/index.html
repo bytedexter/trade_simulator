@@ -314,13 +314,45 @@
                         readonly
                       />
                     </div>
-                    <button
-                      id="confirmButton"
-                      type="submit"
-                      class="w-full py-2 px-4 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600"
+                    <div
+                      class="flex items-center p-4 mb-4 text-sm text-red-800 border border-red-300 rounded-lg bg-red-50 dark:bg-gray-800 dark:text-red-400 dark:border-red-800"
+                      role="alert"
+                      id="errorAlert"
+                      style="display: none"
                     >
-                      Confirm
-                    </button>
+                      <svg
+                        class="flex-shrink-0 inline w-4 h-4 me-3"
+                        aria-hidden="true"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z"
+                        />
+                      </svg>
+                      <span class="sr-only">Info</span>
+                      <div>
+                        <span class="font-medium" id="feedback404"></span>
+                      </div>
+                    </div>
+                    <div class="display: flex flex-row">
+                      <button
+                        id="confirmBuyButton"
+                        type="submit"
+                        class="w-full py-2 px-4 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        id="confirmButton"
+                        type="submit"
+                        data-modal-toggle="crud-modal"
+                        class="w-1/2 py-2 px-4 ml-2 bg-gray-600 text-white font-semibold rounded-md hover:bg-gray-700 focus:ring-2 focus:ring-gray-500 dark:bg-gray-500 dark:hover:bg-gray-600"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </form>
                 </div>
               </div>
@@ -447,6 +479,26 @@
                         placeholder="Sell price"
                         readonly
                       />
+                    </div>
+                    <div
+                      style="display: none"
+                      class="flex items-center p-4 mb-4 text-sm text-red-800 border border-red-300 rounded-lg bg-red-50 dark:bg-gray-800 dark:text-red-400 dark:border-red-800"
+                      role="alert"
+                      id="errorAlert"
+                    >
+                      <svg
+                        class="flex-shrink-0 inline w-4 h-4 me-3"
+                        aria-hidden="true"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z"
+                        />
+                      </svg>
+                      <span class="sr-only">Info</span>
+                      <div class="font-medium" id="feedbacksell404"></div>
                     </div>
                     <button
                       id="confirmSellButton"
