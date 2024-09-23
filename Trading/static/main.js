@@ -484,30 +484,32 @@ document.getElementById("buyForm").addEventListener("submit", function (event) {
   if (isNaN(quantity) || quantity <= 0) {
     document.getElementById("feedback404").innerText =
       "Please enter a valid quantity";
-    document.getElementById("errorAlert").style.display = "block";
+    document.getElementById("errorAlert").style.display = "flex";
     return;
   }
 
   if (isNaN(buyPrice) || buyPrice <= 0) {
     document.getElementById("feedback404").innerText =
       "Please enter a valid buy price";
-    document.getElementById("errorAlert").style.display = "block";
+    document.getElementById("errorAlert").style.display = "flex";
     return;
   }
 
   const symbol = document.getElementById("ticker").value;
 
-  // Check if the current time is before 3:30 PM IST
+  // Check if the current time is within market hours (10:00 AM to 3:30 PM IST)
   const now = new Date();
   const istOffset = 5.5 * 60 * 60 * 1000; // IST offset in milliseconds
   const istNow = new Date(now.getTime() + istOffset);
+  const marketOpenTime = new Date(istNow);
+  marketOpenTime.setHours(10, 0, 0, 0); // Set to 10:00 AM IST
   const marketCloseTime = new Date(istNow);
   marketCloseTime.setHours(15, 30, 0, 0); // Set to 3:30 PM IST
 
-  if (istNow >= marketCloseTime) {
+  if (istNow < marketOpenTime || istNow >= marketCloseTime) {
     document.getElementById("feedback404").innerText =
-      "Market is closed. Cannot place order.";
-    document.getElementById("errorAlert").style.display = "";
+      "Market is closed. Cannot place GTT buy order.";
+    document.getElementById("errorAlert").style.display = "flex";
     return;
   }
 
@@ -526,14 +528,14 @@ document.getElementById("buyForm").addEventListener("submit", function (event) {
         console.error("Error fetching stock price:", error);
         document.getElementById("feedback404").innerText =
           "Error fetching stock price";
-        document.getElementById("errorAlert").style.display = "block";
+        document.getElementById("errorAlert").style.display = "flex";
       });
   } else {
     // For trigger price, use the user-entered buyPrice
     async function placeGttOrder(userDetails, symbol, quantity, buyPrice) {
       try {
         // Send POST request to the backend API to place the GTT order
-        const response = await fetch("http://127.0.0.1:5001/add_gtt_order", {
+        const response = await fetch(`${config.backendUrl}/add_gtt_order`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -552,10 +554,10 @@ document.getElementById("buyForm").addEventListener("submit", function (event) {
           const errorData = await response.json();
           if (errorData.error === 'Market is closed. Cannot place GTT sell order.') {
             document.getElementById("feedback404").innerText = errorData.error;
-            document.getElementById("errorAlert").style.display = "block";
+            document.getElementById("errorAlert").style.display = "flex";
           } else {
             document.getElementById("feedback404").innerText = `Failed to place GTT order for ${quantity} shares of ${symbol} at $${buyPrice.toFixed(2)} each.`;
-            document.getElementById("errorAlert").style.display = "block";
+            document.getElementById("errorAlert").style.display = "flex";
           }
           return;
         }
@@ -565,14 +567,16 @@ document.getElementById("buyForm").addEventListener("submit", function (event) {
         ).innerText = `Successfully placed GTT order for ${quantity} shares of ${symbol} at $${buyPrice.toFixed(
           2
         )} each.`;
-        document.getElementById("errorAlert").style.display = "block";
+        document.getElementById("errorAlert").style.display = "flex";
+        // Close the modal after successful order placement
+        document.querySelector('[data-modal-toggle="crud-modal"]').click();
       } catch (error) {
         // Log and display any error encountered while placing the order
         console.error("Error placing GTT order:", error);
         document.getElementById(
           "feedback404"
         ).innerText = `Error placing GTT order: ${error.message}`;
-        document.getElementById("errorAlert").style.display = "block";
+        document.getElementById("errorAlert").style.display = "flex";
       }
     }
 
