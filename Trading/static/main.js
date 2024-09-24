@@ -499,13 +499,12 @@ document.getElementById("buyForm").addEventListener("submit", function (event) {
   const marketOpenTime = new Date(istNow);
   marketOpenTime.setHours(10, 0, 0, 0); // Set to 10:00 AM IST
   const marketCloseTime = new Date(istNow);
-  marketCloseTime.setHours(15, 30, 0, 0); // Set to 3:30 PM IST
+  marketCloseTime.setHours(15, 30, 0, 0); // Set to 3:30 PM IST 
 
   if (istNow < marketOpenTime || istNow >= marketCloseTime) {
     feedback404.innerText = "Market is closed. Cannot place order.";
-    errorAlert.style.display = "flex";
     return;
-  }
+  } 
 
   // Fetch the market price if priceOption is 'market' to ensure accuracy
   if (priceOption === "market") {
@@ -559,12 +558,13 @@ document.getElementById("buyForm").addEventListener("submit", function (event) {
         }
         // Display a success message in the UI
         document.getElementById(
-          "feedback404"
+          "feedback"
         ).innerText = `Successfully placed GTT order for ${quantity} shares of ${symbol} at $${buyPrice.toFixed(
           2
         )} each.`;
         document.getElementById("errorAlert").style.display = "flex";
         // Close the modal after successful order placement
+        document.querySelector('[data-modal-toggle="crud-modal-2"]').click();
       } catch (error) {
         // Log and display any error encountered while placing the order
         console.error("Error placing GTT order:", error);
@@ -579,6 +579,7 @@ document.getElementById("buyForm").addEventListener("submit", function (event) {
     // You need to pass the correct variables: userDetails, symbol, quantity, and buyPrice
     placeGttOrder(userDetails, symbol, quantity, buyPrice);
   }
+  document.querySelector('[data-modal-toggle="crud-modal-2"]').click();
 });
 
 document.querySelector('[data-modal-toggle="crud-modal"]').addEventListener("click", function () {
@@ -616,13 +617,13 @@ document.getElementById('sellForm').addEventListener('submit', function(event) {
 
   const symbol = document.getElementById("ticker").value;
 
-  // Check if the current time is within market hours (10:00 AM to 3:30 PM IST)
+ // Check if the current time is within market hours (10:00 AM to 3:30 PM IST)
   const now = new Date();
   const istNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
   const marketOpenTime = new Date(istNow);
   marketOpenTime.setHours(10, 0, 0, 0); // Set to 10:00 AM IST
   const marketCloseTime = new Date(istNow);
-  marketCloseTime.setHours(15, 30, 0, 0); // Set to 3:30 PM IST
+  marketCloseTime.setHours(15, 30, 0, 0); // Set to 3:30 PM IST 
 
   if (istNow < marketOpenTime && istNow >= marketCloseTime) {
     feedback404.innerText = "Market is closed. Cannot place order.";
@@ -653,7 +654,7 @@ document.getElementById('sellForm').addEventListener('submit', function(event) {
     async function placeShortSellOrder(userDetails, symbol, quantity, buyPrice) {
       try {
         // Send POST request to the backend API to place the GTT order
-        const response = await fetch(`http://127.0.0.1:5001/add_short_sell_order`, {
+        const response = await fetch(`http://127.0.0.1:5001/sell_order`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -662,7 +663,6 @@ document.getElementById('sellForm').addEventListener('submit', function(event) {
             user_id: userDetails._id, // Ensure _id is passed as a valid MongoDB ObjectId
             stock_symbol: symbol,
             quantity: quantity,
-            trigger_price: sellPrice,
             order_type: tradeType, // Use the user-entered buyPrice as the trigger price
           }),
         });
@@ -703,7 +703,7 @@ document.getElementById('sellForm').addEventListener('submit', function(event) {
 
     // Example usage of the placeGttOrder function
     // You need to pass the correct variables: userDetails, symbol, quantity, and buyPrice
-    placeShortSellOrder(userDetails, symbol, quantity, buyPrice);
+    placeShortSellOrder(userDetails, symbol, quantity, sellPrice);
   }
 });
 
@@ -738,6 +738,10 @@ function updateSellPortfolio(symbol, quantity, sellPrice, tradeType){
 
   let stockExists = false;
   userDetails.stock_holdings = userDetails.stock_holdings.map((holding) => {
+    if(parseInt(quantity)>holding.quantity){
+      document.getElementById("sellFeedback404").innerText =
+          "Cannot sell more stocks than you own!";
+    }
     if (holding.stock_symbol == symbol) {
       holding.quantity = parseInt(holding.quantity) - parseInt(quantity);
       stockExists=true
@@ -745,6 +749,9 @@ function updateSellPortfolio(symbol, quantity, sellPrice, tradeType){
     return holding;
   });
 
+  userDetails.stock_holdings = userDetails.stock_holdings.filter(
+    (holding) => holding.quantity > 0
+  );
   // If the stock doesn't exist or was bought at a different price, append it as a new entry
   if (!stockExists) {
     document.getElementById("feedback").innerText =
@@ -853,13 +860,13 @@ function updatePortfolio(symbol, quantity, price, tradeType) {
 
   let stockExists = false;
   userDetails.stock_holdings = userDetails.stock_holdings.map((holding) => {
-    stockExists = true;
     if (holding.stock_symbol === symbol) {
       // If the stock exists and was bought at the same price, increase the quantity
       holding.quantity = parseInt(holding.quantity) + parseInt(quantity);
       if (parseInt(holding.purchase_price) != parseInt(price)) {
         holding.purchase_price = (holding.purchase_price + price)/2;
       }
+      stockExists = true;
     }
     return holding;
   });

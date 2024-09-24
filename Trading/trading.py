@@ -9,7 +9,9 @@ from bson import ObjectId, errors
 from flask_cors import CORS
 from datetime import datetime, time
 import pytz
-import time as time_module  
+import schedule
+import time as time_module
+
 
 ist = pytz.timezone('Asia/Kolkata')
 
@@ -29,6 +31,7 @@ db = get_database()
 # Collections
 users_col = db['USERS']
 gtt_book_col = db['GTT_BOOK']
+gtt_sell_book_col = db['SHORT_SELL_BOOK']
 
 # Helper Function to Fetch Stock Data
 def fetch_stock_data(ticker):
@@ -58,10 +61,10 @@ def add_gtt_order():
     trigger_price = data.get('trigger_price')
     quantity = data.get('quantity')
     order_type = data.get('order_type')
-    now = datetime.now(ist)
+    """ now = datetime.now(ist)
     market_close_time = time(15, 30)
     if now.time() >= market_close_time:
-        return jsonify({'error': 'Market is closed. Cannot place GTT sell order.'}), 400
+        return jsonify({'error': 'Market is closed. Cannot place GTT sell order.'}), 400 """
 
     if not all([user_id, stock_symbol, trigger_price, quantity]):
         return jsonify({'error': 'Missing required fields'}), 400
@@ -89,20 +92,20 @@ def add_gtt_order():
     gtt_book_col.insert_one(gtt_order)
     return jsonify({'message': 'GTT order added successfully'}), 201
 
-@app.route('/add_short_sell_order', methods=['POST'])
+@app.route('/sell_order', methods=['POST'])
 def add_short_sell_order():
     data = request.get_json()
     user_id = data.get('user_id')
     stock_symbol = data.get('stock_symbol')
-    trigger_price = data.get('trigger_price')
+    
     quantity = data.get('quantity')
     order_type = data.get('order_type', 'long')  # default to trigger if not specified    
     now = datetime.now(ist)
     market_close_time = time(15, 30)
     if now.time() >= market_close_time:
-        return jsonify({'error': 'Market is closed. Cannot place GTT sell order.'}), 400
+        return jsonify({'error': 'Market is closed. Cannot place order.'}), 400
 
-    if not all([user_id, stock_symbol, trigger_price, quantity]):
+    if not all([user_id, stock_symbol, quantity]):
         return jsonify({'error': 'Missing required fields'}), 400
 
     try:
@@ -117,16 +120,15 @@ def add_short_sell_order():
         'user_id': user_obj_id,
         'stock_symbol': stock_symbol,
         'quantity': int(quantity),
-        'trigger_price': float(trigger_price),
         'created_at': datetime.now(ist),
         'order_type': order_type
     }
 
     gtt_sell_book_col.insert_one(sell_order)
-    return jsonify({'message': 'GTT sell order added successfully'}), 201
+    return jsonify({'message': 'Short Sell order added successfully'}), 201
 
 # Ensure to initialize the gtt_sell_book_col similar to gtt_book_col
-gtt_sell_book_col = db['GTT_SELL_BOOK']
+
 
 # Background Worker to Monitor GTT Orders
 count =0
@@ -224,52 +226,110 @@ def gtt_order_worker():
 worker_thread = threading.Thread(target=gtt_order_worker, daemon=True)
 worker_thread.start()
 
-def sell_order():
-    while True:
-        gtt_sell_orders = list(gtt_sell_book_col.find())
-        stock_symbols = list(set(order['stock_symbol'] for order in gtt_sell_orders))
-
-        stock_prices = {}
-        for symbol in stock_symbols:
-            data = fetch_stock_data(symbol)
-            if data:
-                stock_prices[symbol] = data['current_price']
-            else:
-                print(f"Could not fetch data for {symbol}")
-                
+def sell_worker():
+    gtt_sell_orders = list(gtt_sell_book_col.find())
+    stock_symbols = list(set(order['stock_symbol'] for order in gtt_sell_orders))
+    stock_prices = {}
+    for symbol in stock_symbols:
+        data = fetch_stock_data(symbol)
+        if data:
+            stock_prices[symbol] = data['current_price']
+        else:
+            print(f"Could not fetch data for {symbol}")
+    
+    
+    market_close_time = time(15, 30)
+    market_open_time = time(10,00)
+    now = datetime.now(ist)
+    if now.time() >= market_close_time or now.time() < market_open_time: 
         for order in gtt_sell_orders:
             user_id = order['user_id']
             stock_symbol = order['stock_symbol']
-            trigger_price = order['trigger_price']
             quantity = order['quantity']
             current_price = stock_prices.get(stock_symbol)
+            user = users_col.find_one({'_id': user_id})
+            if user:
+                stock_holdings = user.get('stock_holdings', [])
+                cash_holding = user.get('cash_holding', {'cash_in_hand': 0})
+                intraday_holdings = user.get('intraday_holding', {'intraday_buy':0})
+                total_cost = quantity * current_price
 
-            if current_price and current_price <= trigger_price:
-                user = users_col.find_one({'_id': user_id})
-                if user:
-                    stock_holdings = user.get('stock_holdings', [])
-                    for holding in stock_holdings:
-                        if holding['stock_symbol'] == stock_symbol and holding['quantity'] >= quantity:
-                            holding['quantity'] -= quantity
-                            if holding['quantity'] == 0:
-                                stock_holdings.remove(holding)
-                            break
-                    else:
-                        print("Not enough stock to sell.")
-                        continue
+                # Update stock holdings
+                for holding in stock_holdings:
+                    if holding['stock_symbol'] == stock_symbol:
+                        holding['quantity'] += quantity
+                        holding['purchase_price'] = current_price
+                        holding['purchase_date'].append(datetime.now())
+                        break
+                else:
+                    stock_holdings.append({
+                        'stock_symbol': stock_symbol,
+                        'quantity': quantity,
+                        'purchase_price': current_price,
+                        'purchase_date': [datetime.now()]
+                    })
 
-                    users_col.update_one(
-                        {'_id': user_id},
-                        {'$set': {'stock_holdings': stock_holdings}}
-                    )
+                # Update cash holdings
+                cash_holding['cash_in_hand'] -= total_cost
+                intraday_holdings['intraday_buy']+=total_cost
 
-                    print(f"GTT Sell Order Executed: Sold {quantity} shares of {stock_symbol} at {current_price}.")
-                    gtt_sell_book_col.delete_one({'_id': order['_id']})
-  # Check every minute
+                # Update user document
+                users_col.update_one(
+                    {'_id': user_id},
+                    {'$set': {
+                        'stock_holdings': stock_holdings,
+                        'cash_holding': cash_holding,
+                        'intraday_holdings': intraday_holdings
+                    }}
+                )
 
-sell_worker_thread = threading.Thread(target=gtt_short_sell_order, daemon=True)
-sell_worker_thread.start()
+                # Record transaction history
+                transaction_history = user.get('transaction_history', [])
+                transaction_history.append({
+                    'type': 'buy',
+                    'stock_symbol': stock_symbol,
+                    'quantity': quantity,
+                    'price': current_price,
+                    'totalCost': total_cost,
+                    'purchase_date': datetime.now()
+                })
+                users_col.update_one(
+                    {'_id': user_id},
+                    {'$set': {'transaction_history': transaction_history}}
+                )
 
+                # Remove the executed order from the GTT sell book
+                gtt_sell_book_col.delete_one({'_id': order['_id']})
+
+                print(f"Short Sell Order Balanced: Bought {quantity} shares of {stock_symbol} at {current_price}.")
+
+def reset_intraday_holdings():
+    users = users_col.find()
+    for user in users:
+        intraday_holdings = user.get('intraday_holdings', {'intraday_buy': 0, 'intraday_sell': 0})
+        intraday_holdings['intraday_buy'] = 0
+        intraday_holdings['intraday_sell'] = 0
+        users_col.update_one(
+            {'_id': user['_id']},
+            {'$set': {'intraday_holdings': intraday_holdings}}
+        )
+    print("Intraday holdings reset for all users.")
+    
+# Schedule the sell_worker function to run at 3:30 PM every day
+schedule.every().day.at("01:22").do(sell_worker)
+
+# Schedule the reset_intraday_holdings function to run at 10:00 AM every day
+schedule.every().day.at("10:00").do(reset_intraday_holdings)
+
+# Function to run the scheduler
+def run_scheduler():
+    while True:
+        schedule.run_pending()
+        time_module.sleep(1)
+
+scheduler_thread = threading.Thread(target=run_scheduler)
+scheduler_thread.daemon = True
+scheduler_thread.start()
 
 # Run Flask App
 if __name__ == '__main__':
