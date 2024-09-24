@@ -89,15 +89,19 @@ def add_gtt_order():
     gtt_book_col.insert_one(gtt_order)
     return jsonify({'message': 'GTT order added successfully'}), 201
 
-@app.route('/add_gtt_sell_order', methods=['POST'])
-def add_gtt_sell_order():
+@app.route('/add_short_sell_order', methods=['POST'])
+def add_short_sell_order():
     data = request.get_json()
     user_id = data.get('user_id')
     stock_symbol = data.get('stock_symbol')
     trigger_price = data.get('trigger_price')
     quantity = data.get('quantity')
     order_type = data.get('order_type', 'long')  # default to trigger if not specified    
-    
+    now = datetime.now(ist)
+    market_close_time = time(15, 30)
+    if now.time() >= market_close_time:
+        return jsonify({'error': 'Market is closed. Cannot place GTT sell order.'}), 400
+
     if not all([user_id, stock_symbol, trigger_price, quantity]):
         return jsonify({'error': 'Missing required fields'}), 400
 
@@ -215,14 +219,12 @@ def gtt_order_worker():
                     gtt_book_col.delete_one({'_id': order['_id']})
 
         # Sleep for a defined interval before checking again
-        
-        print("Iteration Count: ", count)
 
 # Start Background Worker Thread
 worker_thread = threading.Thread(target=gtt_order_worker, daemon=True)
 worker_thread.start()
 
-def gtt_sell_order_worker():
+def sell_order():
     while True:
         gtt_sell_orders = list(gtt_sell_book_col.find())
         stock_symbols = list(set(order['stock_symbol'] for order in gtt_sell_orders))
@@ -232,7 +234,9 @@ def gtt_sell_order_worker():
             data = fetch_stock_data(symbol)
             if data:
                 stock_prices[symbol] = data['current_price']
-
+            else:
+                print(f"Could not fetch data for {symbol}")
+                
         for order in gtt_sell_orders:
             user_id = order['user_id']
             stock_symbol = order['stock_symbol']
@@ -263,7 +267,7 @@ def gtt_sell_order_worker():
                     gtt_sell_book_col.delete_one({'_id': order['_id']})
   # Check every minute
 
-sell_worker_thread = threading.Thread(target=gtt_sell_order_worker, daemon=True)
+sell_worker_thread = threading.Thread(target=gtt_short_sell_order, daemon=True)
 sell_worker_thread.start()
 
 

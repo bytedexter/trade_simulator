@@ -110,26 +110,45 @@ const userProfile = asyncHandler(async (req, res) => {
 
 const updatePortfolio = asyncHandler(async (req, res) => {
   try {
-    const { email, intraday_holdings, cash_holding, stock_holdings, transaction_history } = req.body;
-
-    const user = await User.findOneAndUpdate(
-      { email },
-      {
-        $set: {
-          'intraday_holdings.intraday_buy': intraday_holdings,
-          'cash_holding.cash_in_hand': cash_holding,
-          'stock_holdings': stock_holdings,
-          'transaction_history': transaction_history
-        }
-      },
-      { new: true }
-    );
-
-    if (!user) {
-      return res.status(constants.NOT_FOUND).json({ message: 'User not found' });
+    const { email, intraday_buy, intraday_sell, cash_holding, stock_holdings, transaction_history } = req.body;
+    
+    if(!intraday_buy){
+      const user = await User.findOneAndUpdate(
+        { email },
+        {
+          $set: {
+            'intraday_holdings.intraday_sell': intraday_sell,
+            'cash_holding.cash_in_hand': cash_holding,
+            'stock_holdings': stock_holdings,
+            'transaction_history': transaction_history
+          }
+        },
+        { new: true }
+      );
+      if (!user) {
+        return res.status(constants.NOT_FOUND).json({ message: 'User not found' });
+      }
+      res.status(constants.OK).json({ message: 'Portfolio updated successfully', user });
     }
-
-    res.status(constants.OK).json({ message: 'Portfolio updated successfully', user });
+    else{
+      const user = await User.findOneAndUpdate(
+        { email },
+        {
+          $set: {
+            'intraday_holdings.intraday_buy': intraday_buy,
+            'cash_holding.cash_in_hand': cash_holding,
+            'stock_holdings': stock_holdings,
+            'transaction_history': transaction_history
+          }
+        },
+        { new: true }
+      )
+      if (!user) {
+        return res.status(constants.NOT_FOUND).json({ message: 'User not found' });
+      }
+  
+      res.status(constants.OK).json({ message: 'Portfolio updated successfully', user });
+    }
   } catch (error) {
     console.error('Error updating portfolio:', error);
     res.status(constants.INTERNAL_SERVER_ERROR).json({ message: 'Internal server error' });
