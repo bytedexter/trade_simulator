@@ -1,12 +1,31 @@
 const express = require('express');
-const mongoose = require('mongoose');
-const connectDb = require('./config/db'); // Database connection
-const cors = require("cors");
-require("dotenv").config();
-const fs = require('fs');
-const path = require('path');
+const cors = require('cors');
+const User = require('./models/user'); // Adjust the path as necessary
+const connectDb = require('./config/db'); // Adjust the path as necessary
+
 const app = express();
-const PORT = 8000;
+
+const PORT = process.env.PORT || 8000;
+
+// Example endpoint to update transaction history
+app.post('/api/transaction', async (req, res) => {
+  try {
+    const { userId, transaction } = req.body;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    user.transaction_history.push(transaction);
+    await user.save();
+
+    // Emit the updated transaction history to all connected clients
+    io.emit('updateTransactionHistory', user.transaction_history);
+
+    res.status(200).json(user.transaction_history);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 // Connect to MongoDB
 connectDb();
@@ -17,14 +36,14 @@ app.use(express.json());
 // Use CORS middleware to allow all origins
 app.use(cors());
 
-//Routes
-app.use("/api/users", require("./routes/userRoutes")); // Change this line
+// Routes
+app.use("/api/users", require("./routes/userRoutes")); // Adjust the path as necessary
 
 app.get("/api", (req, res) => {
-    res.send("Welcome to the TradePro Backend");
+  res.send("Welcome to the TradePro Backend");
 });
 
 // Start server
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });

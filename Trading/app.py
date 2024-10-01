@@ -4,8 +4,26 @@ import pandas as pd
 import pandas_ta as ta
 from datetime import datetime, timedelta
 import csv
+from flask_cors import CORS
+
+# Initialize Flask App
 
 app = Flask(__name__)
+
+# Dynamically set Access-Control-Allow-Origin based on request origin
+@app.after_request
+def apply_cors(response):
+    # Extract origin from request headers
+    origin = request.headers.get('Origin')
+    allowed_origins = ['http://localhost:8000', 'http://localhost:5173']
+    
+    # Check if the request's origin is in the allowed list
+    if origin in allowed_origins:
+        response.headers['Access-Control-Allow-Origin'] = origin
+    
+    return response
+
+CORS(app)
 
 def fetch_yahoo_data(ticker, interval, ema_period=20, rsi_period=14):
     end_date = datetime.now()
@@ -84,7 +102,6 @@ def get_symbols():
     with open('symbols.txt') as f:
         symbols = [line.strip() for line in f]
     return jsonify(symbols)
-
 
 @app.route('/api/<symbol>', methods=['GET'])
 def get_stock_price(symbol):

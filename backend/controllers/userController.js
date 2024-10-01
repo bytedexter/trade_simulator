@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const User = require('../models/user');
 const constants = require("../constants");
+const shortSellBook = require("../models/shortSellBook");
 
 // Sign-up function
 const Sign_up = asyncHandler(async (req, res) => {
@@ -192,19 +193,38 @@ const resetPortfolio = asyncHandler(async (req, res) => {
   }
 });
 
+const pendingOrders = asyncHandler(async (req, res) => {
+  try {
+    // Extract the ID from the authenticated user
+    const id = req.user._id;
+
+    // Fetch and return the pending orders for the specific user
+    if (id) {
+      const pendingOrders = await shortSellBook.find({ user_id: id });
+      if (pendingOrders.length > 0) {
+        return res.status(constants.OK).json(pendingOrders);
+      } else {
+        return res.status(constants.NOT_FOUND).json({ message: 'No pending orders found for this user' });
+      }
+    } else {
+      return res.status(constants.BAD_REQUEST).json({ message: 'User ID is required' });
+    }
+  } catch (error) {
+    console.error('Error fetching pending orders:', error);
+    res.status(constants.INTERNAL_SERVER_ERROR).json({ message: 'Internal server error' });
+  }
+});
 
 const Sign_out = asyncHandler(async (req, res) => {
   // Invalidate the token on the client side
   res.status(200).json({ message: "User signed out successfully" });
 });
-
-
-
 module.exports = {
   Sign_up,
   Sign_in,
   Sign_out,
   userProfile,
   updatePortfolio,
-  resetPortfolio
+  resetPortfolio,
+  pendingOrders
 };

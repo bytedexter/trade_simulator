@@ -97,13 +97,13 @@ def add_short_sell_order():
     data = request.get_json()
     user_id = data.get('user_id')
     stock_symbol = data.get('stock_symbol')
-    
+    sell_price = data.get('sell_price')
     quantity = data.get('quantity')
     order_type = data.get('order_type', 'long')  # default to trigger if not specified    
     now = datetime.now(ist)
     market_close_time = time(15, 30)
-    if now.time() >= market_close_time:
-        return jsonify({'error': 'Market is closed. Cannot place order.'}), 400
+    """ if now.time() >= market_close_time:
+        return jsonify({'error': 'Market is closed. Cannot place order.'}), 400 """
 
     if not all([user_id, stock_symbol, quantity]):
         return jsonify({'error': 'Missing required fields'}), 400
@@ -114,13 +114,29 @@ def add_short_sell_order():
         return jsonify({'error': 'Invalid user_id format.'}), 400
 
     if not users_col.find_one({'_id': user_obj_id}):
-        return jsonify({'error': 'User not found'}), 404
+        return jsonify({'error{': 'User not found'}), 404
+    
+    user = users_col.find_one({'_id': user_obj_id})
+    new_intraday_sell = round(user['intraday_holdings']['intraday_sell'] + (int(quantity) * float(sell_price)),2)
+    new_cash_in_hand = round(user['cash_holding']['cash_in_hand'] + (int(quantity) * float(sell_price)),2)
 
+    # Update the user's intraday sell value and cash holdings
+    users_col.update_one(
+        {'_id': user_obj_id},
+        {
+            '$set': {
+                'intraday_holdings.intraday_sell': new_intraday_sell,
+                'cash_holding.cash_in_hand': new_cash_in_hand
+            }
+        }
+    )
+        
     sell_order = {
         'user_id': user_obj_id,
         'stock_symbol': stock_symbol,
         'quantity': int(quantity),
         'created_at': datetime.now(ist),
+        'trigger_price': sell_price,
         'order_type': order_type
     }
 
@@ -286,7 +302,7 @@ def sell_worker():
                 # Record transaction history
                 transaction_history = user.get('transaction_history', [])
                 transaction_history.append({
-                    'type': 'buy',
+                    'type': 'Square-off Buy',
                     'stock_symbol': stock_symbol,
                     'quantity': quantity,
                     'price': current_price,

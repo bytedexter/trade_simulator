@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import StockCard from "./StockCard";
 import axios from "axios";
 import moment from "moment-timezone";
+import { Mosaic } from "react-loading-indicators";
 
 import {
   ChevronLeft,
@@ -20,12 +21,43 @@ import {
 
 const Dashboard = () => {
   const [userDetails, setUserDetails] = useState([]);
+  const [pendingOrders, setPendingOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(5);
   const [isExpanded, setIsExpanded] = useState(true);
+
+  useEffect(() => {
+    // Fetch pending orders
+    const fetchPendingOrders = async () => {
+      try {
+        const token = localStorage.getItem("authToken");
+        if (!token) {
+          console.error("No auth token found. Redirecting to login.");
+          navigate("/signin");
+          return;
+        }
+        
+        const response = await axios.get(
+          "http://localhost:8000/api/users/pending-orders",  // Ensure URL points to the correct server/port
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,  // Pass the token in the headers
+            },
+          }
+        );
+        
+        setPendingOrders(response.data);
+      } catch (error) {
+        console.error("Error fetching pending orders:", error.response?.data || error.message);
+      }
+    };
+  
+    fetchPendingOrders();
+  }, []);
+  
 
   useEffect(() => {
     const fetchUserDetails = async () => {
@@ -51,7 +83,11 @@ const Dashboard = () => {
   }, []);
 
   if (loading) {
-    return <p>Loading user data...</p>;
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Mosaic color="#32cd32" size="medium" text="" textColor="" />
+      </div>
+    );
   }
 
   const logout = () => {
@@ -210,20 +246,20 @@ const Dashboard = () => {
             className="p-6 bg-white rounded-lg shadow-lg"
           >
             <h2 className="text-xl font-semibold text-gray-700 mb-4">
-              Watchlist
+              Pending Orders
             </h2>
-            <StockCard
-              stockSymbol="AAPL"
-              stockName="Apple Inc."
-              stockPrice={150.25}
-              stockChange={2.5}
-            />
-            <StockCard
-              stockSymbol="GOOGL"
-              stockName="Alphabet Inc."
-              stockPrice={2750.8}
-              stockChange={-1.2}
-            />
+            {pendingOrders.length == 0 ? (
+              <div className="flex items-center justify-center bg-opacity-75 text-gray-500 rounded-lg h-full">
+                <p> No Pending Orders yet.</p>
+              </div>
+            ) : (
+              pendingOrders.map((order, index) => (
+                <StockCard
+                  stockSymbol={order.stock_symbol}
+                  stockPrice={order.trigger_price}
+                />
+              ))
+            )}
           </motion.div>
 
           <motion.div
@@ -251,127 +287,136 @@ const Dashboard = () => {
             </ul>
           </motion.div>
         </div>
-
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.6 }}
-          className="bg-white rounded-lg shadow-lg p-6"
+          className="bg-white rounded-lg shadow-lg p-6 mt-6"
         >
           <h2 className="text-2xl font-bold text-gray-800 mb-6">
             Transaction History
           </h2>
           <div className="overflow-x-auto">
-            <table className="min-w-full table-auto">
-              <thead>
-                <tr className="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
-                  <th className="py-3 px-6 text-left">S.No</th>
-                  <th className="py-3 px-6 text-left">Stock</th>
-                  <th className="py-3 px-6 text-right">Price</th>
-                  <th className="py-3 px-6 text-center">Type</th>
-                  <th className="py-3 px-6 text-right">Quantity</th>
-                  <th className="py-3 px-6 text-right">Date</th>
-                  <th className="py-3 px-6 text-right">Time</th>
-                </tr>
-              </thead>
-              <tbody className="text-gray-600 text-sm">
-                <AnimatePresence>
-                  {currentTransactions.map((transaction, index) => {
-                    const istDateTime = moment(transaction.timestamp).tz(
-                      "Asia/Kolkata"
-                    );
-                    const date = istDateTime.format("YYYY-MM-DD");
-                    const time = istDateTime.format("HH:mm:ss");
-                    return (
-                      <motion.tr
-                        key={transaction._id} // Ensure each key is unique
-                        className="border-b border-gray-200 hover:bg-gray-50 transition duration-300"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ duration: 0.3, delay: index * 0.1 }}
-                      >
-                        <td className="py-4 px-6 text-left whitespace-nowrap font-medium">
-                          {indexOfFirstItem + index + 1}
-                        </td>
-                        <td className="py-4 px-6 text-left whitespace-nowrap font-medium">
-                          {transaction.stock_symbol}
-                        </td>
-                        <td className="py-4 px-6 text-right font-medium">
-                          ₹{transaction.price}
-                        </td>
-                        <td className="py-4 px-6 text-center">
-                          <span
-                            className={`px-3 py-1 rounded-full text-xs font-medium ${
-                              transaction.type === "intraday Buy" ||
-                              transaction.type === "buy"
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-green-100 text-green-800"
-                            }`}
-                          >
-                            {transaction.type}
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 text-right font-medium">
-                          {transaction.quantity}
-                        </td>
-                        <td className="py-4 px-6 text-right font-medium">
-                          {date}
-                        </td>
-                        <td className="py-4 px-6 text-right font-medium">
-                          {time}
-                        </td>
-                      </motion.tr>
-                    );
-                  })}
-                </AnimatePresence>
-              </tbody>
-            </table>
+            {transactionHistory.length === 0 ? (
+              <div className="text-center text-gray-600">
+                No transactions yet.
+              </div>
+            ) : (
+              <table className="min-w-full table-auto">
+                <thead>
+                  <tr className="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
+                    <th className="py-3 px-6 text-left">S.No</th>
+                    <th className="py-3 px-6 text-left">Stock</th>
+                    <th className="py-3 px-6 text-right">Price</th>
+                    <th className="py-3 px-6 text-center">Type</th>
+                    <th className="py-3 px-6 text-right">Quantity</th>
+                    <th className="py-3 px-6 text-right">Date (IST)</th>
+                    <th className="py-3 px-6 text-right">Time (IST)</th>
+                  </tr>
+                </thead>
+                <tbody className="text-gray-600 text-sm">
+                  <AnimatePresence>
+                    {currentTransactions.map((transaction, index) => {
+                      const istDateTime = moment(transaction.timestamp).tz(
+                        "Asia/Kolkata"
+                      );
+                      const date = istDateTime.format("YYYY-MM-DD");
+                      const time = istDateTime.format("HH:mm:ss");
+                      return (
+                        <motion.tr
+                          key={transaction._id} // Ensure each key is unique
+                          className="border-b border-gray-200 hover:bg-gray-50 transition duration-300"
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          transition={{ duration: 0.3, delay: index * 0.1 }}
+                        >
+                          <td className="py-4 px-6 text-left whitespace-nowrap font-medium">
+                            {indexOfFirstItem + index + 1}
+                          </td>
+                          <td className="py-4 px-6 text-left whitespace-nowrap font-medium">
+                            {transaction.stock_symbol}
+                          </td>
+                          <td className="py-4 px-6 text-right font-medium">
+                            ₹{transaction.price}
+                          </td>
+                          <td className="py-4 px-6 text-center">
+                            <span
+                              className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                transaction.type === "intraday Buy" ||
+                                transaction.type === "buy"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-green-100 text-green-800"
+                              }`}
+                            >
+                              {transaction.type}
+                            </span>
+                          </td>
+                          <td className="py-4 px-6 text-right font-medium">
+                            {transaction.quantity}
+                          </td>
+                          <td className="py-4 px-6 text-right font-medium">
+                            {date}
+                          </td>
+                          <td className="py-4 px-6 text-right font-medium">
+                            {time}
+                          </td>
+                        </motion.tr>
+                      );
+                    })}
+                  </AnimatePresence>
+                </tbody>
+              </table>
+            )}
           </div>
-          <div className="mt-4 flex justify-between items-center">
-            <div>
-              <p className="text-sm text-gray-700">
-                Showing{" "}
-                <span className="font-medium">{indexOfFirstItem + 1}</span> to{" "}
-                <span className="font-medium">
-                  {Math.min(indexOfLastItem, transactionHistory.length)}
-                </span>{" "}
-                of{" "}
-                <span className="font-medium">{transactionHistory.length}</span>{" "}
-                results
-              </p>
-            </div>
-            <div>
-              <nav
-                className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
-                aria-label="Pagination"
-              >
-                <button
-                  onClick={() => paginate(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+          {transactionHistory.length > 0 && (
+            <div className="mt-4 flex justify-between items-center">
+              <div>
+                <p className="text-sm text-gray-700">
+                  Showing{" "}
+                  <span className="font-medium">{indexOfFirstItem + 1}</span> to{" "}
+                  <span className="font-medium">
+                    {Math.min(indexOfLastItem, transactionHistory.length)}
+                  </span>{" "}
+                  of{" "}
+                  <span className="font-medium">
+                    {transactionHistory.length}
+                  </span>{" "}
+                  results
+                </p>
+              </div>
+              <div>
+                <nav
+                  className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
+                  aria-label="Pagination"
                 >
-                  <span className="sr-only">Previous</span>
-                  <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-                </button>
-                {Array.from({
-                  length: Math.ceil(transactionHistory.length / itemsPerPage),
-                }).map((_, index) => (
                   <button
-                    key={index}
-                    onClick={() => paginate(index + 1)}
-                    className={`relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium ${
-                      currentPage === index + 1
-                        ? "bg-gray-200"
-                        : "hover:bg-gray-50"
-                    }`}
+                    onClick={() => paginate(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
                   >
-                    {index + 1}
+                    <span className="sr-only">Previous</span>
+                    <ChevronLeft className="h-5 w-5" aria-hidden="true" />
                   </button>
-                ))}
-              </nav>
+                  {Array.from({
+                    length: Math.ceil(transactionHistory.length / itemsPerPage),
+                  }).map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => paginate(index + 1)}
+                      className={`relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium ${
+                        currentPage === index + 1
+                          ? "bg-gray-200"
+                          : "hover:bg-gray-50"
+                      }`}
+                    >
+                      {index + 1}
+                    </button>
+                  ))}
+                </nav>
+              </div>
             </div>
-          </div>
+          )}
         </motion.div>
       </main>
     </div>

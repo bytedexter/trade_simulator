@@ -1,8 +1,8 @@
-import { Schema, model } from 'mongoose';
+const mongoose = require('mongoose');
 
-const gttSellBookSchema = new Schema({
+const gttSellBookSchema = new mongoose.Schema({
     user_id: [{
-        type: Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true,
         unique: true
@@ -26,5 +26,5 @@ const gttSellBookSchema = new Schema({
     timestamps: true
 })
 
-const gttBook = model('GTT_Sell_Book', gttSellBookSchema, "GTT_SELL_BOOK");
-export default gttBook;
+const shortSellBook = mongoose.model('GTT_Sell_Book', gttSellBookSchema, "SHORT_SELL_BOOK");
+module.exports= shortSellBook;
