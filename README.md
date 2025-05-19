@@ -1,1 +1,1 @@
-# trade_simulator
+# Trade_Simulator
