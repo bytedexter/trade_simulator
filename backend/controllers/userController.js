@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const User = require('../models/user');
 const constants = require("../constants");
 const shortSellBook = require("../models/shortSellBook");
+const axios = require('axios'); // Add this line at the top
 
 // Sign-up function
 const Sign_up = asyncHandler(async (req, res) => {
@@ -219,6 +220,37 @@ const Sign_out = asyncHandler(async (req, res) => {
   // Invalidate the token on the client side
   res.status(200).json({ message: "User signed out successfully" });
 });
+
+
+// const getStockData = async (req, res) => {
+//   try {
+//     const ticker = req.query.ticker || 'AAPL';
+//     const period = req.query.period || '6mo';
+//     const interval = req.query.interval || '1d';
+//     // Call your Python backend running on port 5000 (or wherever)
+//     const pythonApiUrl = `http://localhost:5000/api/stock-data?ticker=${ticker}&period=${period}&interval=${interval}`;
+//     const response = await axios.get(pythonApiUrl);
+//     res.json(response.data);
+//   } catch (error) {
+//     res.status(500).json({ error: 'Failed to fetch stock data' });
+//   }
+// };
+
+const getStockData = async (req, res) => {
+  try {
+    const tickers = req.query.ticker || 'AAPL';
+    const period = req.query.period || '6mo';
+    const interval = req.query.interval || '1d';
+    
+    const pythonApiUrl = `http://localhost:5000/api/stock-data?ticker=${tickers}&period=${period}&interval=${interval}`;
+    const response = await axios.get(pythonApiUrl);
+    
+    res.json(response.data);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch stock data' });
+  }
+};
+
 module.exports = {
   Sign_up,
   Sign_in,
@@ -226,5 +258,6 @@ module.exports = {
   userProfile,
   updatePortfolio,
   resetPortfolio,
-  pendingOrders
+  pendingOrders,
+  getStockData
 };

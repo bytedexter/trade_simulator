@@ -3,6 +3,7 @@ const cors = require('cors');
 const User = require('./models/user'); // Adjust the path as necessary
 const connectDb = require('./config/db'); // Adjust the path as necessary
 
+
 const app = express();
 
 const PORT = process.env.PORT || 8000;
