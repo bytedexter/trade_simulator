@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import StockCard from "./StockCard";
+import PendingOrderCard from "./PendingOrderCard";
 import axios from "axios";
 import moment from "moment-timezone";
 import { Mosaic } from "react-loading-indicators";
@@ -19,6 +20,7 @@ import {
   LogOut,
 } from "lucide-react";
 
+
 const Dashboard = () => {
   const [userDetails, setUserDetails] = useState([]);
   const [pendingOrders, setPendingOrders] = useState([]);
@@ -29,35 +31,64 @@ const Dashboard = () => {
   const [itemsPerPage] = useState(5);
   const [isExpanded, setIsExpanded] = useState(true);
 
+  // useEffect(() => {
+  //   // Fetch pending orders
+  //   const fetchPendingOrders = async () => {
+  //     try {
+  //       const token = localStorage.getItem("authToken");
+  //       if (!token) {
+  //         console.error("No auth token found. Redirecting to login.");
+  //         navigate("/signin");
+  //         return;
+  //       }
+        
+  //       const response = await axios.get(
+  //         "http://localhost:8000/api/users/pending-orders",  // Ensure URL points to the correct server/port
+  //         {
+  //           headers: {
+  //             Authorization: `Bearer ${token}`,  // Pass the token in the headers
+  //           },
+  //         }
+  //       );
+        
+  //       setPendingOrders(response.data);
+  //     } catch (error) {
+  //       console.error("Error fetching pending orders:", error.response?.data || error.message);
+  //     }
+  //   };
+  
+  //   fetchPendingOrders();
+  // }, []);
+  
+
   useEffect(() => {
-    // Fetch pending orders
-    const fetchPendingOrders = async () => {
-      try {
-        const token = localStorage.getItem("authToken");
-        if (!token) {
-          console.error("No auth token found. Redirecting to login.");
-          navigate("/signin");
-          return;
-        }
-        
-        const response = await axios.get(
-          "http://localhost:8000/api/users/pending-orders",  // Ensure URL points to the correct server/port
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,  // Pass the token in the headers
-            },
-          }
-        );
-        
-        setPendingOrders(response.data);
-      } catch (error) {
-        console.error("Error fetching pending orders:", error.response?.data || error.message);
+  const fetchPendingOrders = async () => {
+    try {
+      const token = localStorage.getItem("authToken");
+      if (!token) {
+        console.error("No auth token found. Redirecting to login.");
+        navigate("/signin");
+        return;
       }
-    };
-  
-    fetchPendingOrders();
-  }, []);
-  
+
+      const response = await axios.get(
+        "http://localhost:8000/api/users/getPendingOrders", // ✅ Make sure the endpoint matches your Express route
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      setPendingOrders(response.data);
+    } catch (error) {
+      console.error("Error fetching pending orders:", error.response?.data || error.message);
+    }
+  };
+
+  fetchPendingOrders();
+}, []);
+
 
   useEffect(() => {
     const fetchUserDetails = async () => {
@@ -217,7 +248,7 @@ const Dashboard = () => {
               Cash Holdings
             </h2>
             <p className="text-3xl font-bold text-green-600">
-              ₹{userDetails.cash_holding.cash_in_hand}
+              ₹{userDetails.cash_holding.cash_in_hand.toFixed(2)}
             </p>
             <h2 className="text-xl font-semibold text-gray-700 my-4">
               Intraday Profit/Loss
@@ -248,19 +279,24 @@ const Dashboard = () => {
             <h2 className="text-xl font-semibold text-gray-700 mb-4">
               Pending Orders
             </h2>
-            {pendingOrders.length == 0 ? (
+            {pendingOrders.length === 0 ? (
               <div className="flex items-center justify-center bg-opacity-75 text-gray-500 rounded-lg h-full">
-                <p> No Pending Orders yet.</p>
+                <p>No Pending Orders yet.</p>
               </div>
             ) : (
               pendingOrders.map((order, index) => (
-                <StockCard
-                  stockSymbol={order.stock_symbol}
-                  stockPrice={order.trigger_price}
+                <PendingOrderCard
+                  key={index}
+                  stockSymbol={order.ticker}
+                  stockPrice={order.price}
+                  orderType={order.orderType}
+                  quantity={order.quantity}
+                  side={order.type}
+                  status={order.status}
                 />
               ))
             )}
-          </motion.div>
+            </motion.div>
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}

@@ -9,10 +9,12 @@ export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
 
   const login = async (accessToken) => {
+    console.log("✅ Token received after login:", accessToken); // 👈 Log it here
     localStorage.setItem('token', accessToken);
+    console.log("📦 Token saved:", accessToken);
     setIsAuthenticated(true);
     fetchUserData();
-    navigate('/dashboard');
+    //navigate('/dashboard');
   };
 
   const logout = () => {
@@ -23,7 +25,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const fetchUserData = async () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('authToken');
+    console.log("🔑 Using token:", token);
     if (token) {
       const response = await fetch('http://localhost:8000/api/users/profile', {
         headers: {
@@ -55,3 +58,4 @@ export const AuthProvider = ({ children }) => {
 export const useAuth = () => {
   return useContext(AuthContext);
 };
+

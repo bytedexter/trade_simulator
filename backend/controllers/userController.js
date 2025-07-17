@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const User = require('../models/user');
 const constants = require("../constants");
 const shortSellBook = require("../models/shortSellBook");
+const Order = require('../models/Order');
 const axios = require('axios'); // Add this line at the top
 
 // Sign-up function
@@ -88,18 +89,26 @@ const Sign_in = asyncHandler(async (req, res) => {
 
 const userProfile = asyncHandler(async (req, res) => {
   try {
+    console.log('[DEBUG] req.user:', req.user);
     // Extract the ID from the authenticated user
     const id = req.user._id;
+    console.log('[DEBUG] User ID:', id);
 
     // Fetch and return the specific student if id is provided
     if (id) {
       const user = await User.findById(id);
+      console.log('[DEBUG] User from DB:', user);
+
       if (user) {
+        console.log('[DEBUG] User email exists:', !!user.email);
+        console.log('[DEBUG] Full user object:', JSON.stringify(user, null, 2));
         return res.status(constants.OK).json(user);
       } else {
+        console.error('[ERROR] User not found in database');
         return res.status(constants.NOT_FOUND).json({ message: 'User not found' });
       }
     } else {
+      console.warn('[WARNING] No user ID found in request');
       // Fetch and return all students if no id is provided (optional, adjust as needed)
       const users = await User.find({});
       return res.status(constants.OK).json(users);
@@ -222,20 +231,6 @@ const Sign_out = asyncHandler(async (req, res) => {
 });
 
 
-// const getStockData = async (req, res) => {
-//   try {
-//     const ticker = req.query.ticker || 'AAPL';
-//     const period = req.query.period || '6mo';
-//     const interval = req.query.interval || '1d';
-//     // Call your Python backend running on port 5000 (or wherever)
-//     const pythonApiUrl = `http://localhost:5000/api/stock-data?ticker=${ticker}&period=${period}&interval=${interval}`;
-//     const response = await axios.get(pythonApiUrl);
-//     res.json(response.data);
-//   } catch (error) {
-//     res.status(500).json({ error: 'Failed to fetch stock data' });
-//   }
-// };
-
 const getStockData = async (req, res) => {
   try {
     const tickers = req.query.ticker || 'AAPL';
@@ -251,6 +246,161 @@ const getStockData = async (req, res) => {
   }
 };
 
+
+// Buy Order Logic
+const placeBuyOrder = asyncHandler(async (req, res) => {
+  try {
+    const email=req.user.email;
+    const { ticker, quantity, price } = req.body;
+    const totalCost = quantity * price;
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    if (user.cash_holding.cash_in_hand < totalCost) {
+      return res.status(400).json({ message: 'Insufficient funds' });
+    }
+    user.cash_holding.cash_in_hand -= totalCost;
+    const existing = user.stock_holdings.find(h => h.stock_symbol === ticker);
+    if (existing) {
+      existing.quantity += quantity;
+      existing.purchase_price = price;
+      existing.purchase_date.push(new Date());
+    } else {
+      user.stock_holdings.push({
+        stock_symbol: ticker,
+        quantity,
+        purchase_price: price,
+        purchase_date: [new Date()],
+      });
+    }
+    user.transaction_history.push({
+      type: 'buy',
+      stock_symbol: ticker,
+      quantity,
+      price,
+      totalCost,
+      purchase_date: new Date(),
+    });
+    await user.save();
+    res.status(200).json({ message: 'Buy order placed successfully' });
+  } catch (err) {
+    console.error('Buy Order Error:', err);
+    res.status(500).json({ message: 'Buy order failed' });
+  }
+});
+
+
+// Sell Order Logic
+const placeSellOrder = asyncHandler(async (req, res) => {
+  try {
+    const email = req.user.email;
+    const { ticker, quantity, price } = req.body;
+    const totalAmount = quantity * price;
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const holding = user.stock_holdings.find(h => h.stock_symbol === ticker);
+    console.log(holding);
+    if (!holding || holding.quantity < quantity) {
+      return res.status(400).json({ message: 'Insufficient stock holdings to sell' });
+    }
+
+    // Deduct quantity
+    holding.quantity -= quantity;
+
+    // If quantity becomes 0, remove that holding
+    if (holding.quantity === 0) {
+      user.stock_holdings = user.stock_holdings.filter(h => h.stock_symbol !== ticker);
+    }
+
+    // Add to cash in hand
+    user.cash_holding.cash_in_hand += totalAmount;
+
+    // Log the transaction
+    user.transaction_history.push({
+      type: 'sell',
+      stock_symbol: ticker,
+      quantity,
+      price,
+      totalCost: totalAmount,
+      purchase_date: new Date(),
+    });
+
+    await user.save();
+
+    res.status(200).json({ message: 'Sell order placed successfully' });
+  } catch (err) {
+    console.error('Sell Order Error:', err);
+    res.status(500).json({ message: 'Sell order failed' });
+  }
+});
+
+
+const placeLimitOrder = asyncHandler(async (req, res) => {
+  const email = req.user.email;
+  const { ticker, quantity, limitPrice, orderSide } = req.body;
+
+  if (!ticker || !quantity || !limitPrice || !orderSide) {
+    return res.status(400).json({ 
+      message: "All fields are required",
+      missing:{
+        ticker:!!ticker,
+        quantity:!!quantity,
+        limitPrice:!!limitPrice,
+        orderSide:!!orderSide
+      }
+     });
+  }
+
+  const user = await User.findOne({ email });
+  if (!user) return res.status(404).json({ message: 'User not found' });
+
+  // For buy order: ensure user has sufficient funds
+  if (orderSide === 'buy') {
+    const estimatedCost = quantity * limitPrice;
+    if (user.cash_holding.cash_in_hand < estimatedCost) {
+      return res.status(400).json({ message: "Insufficient funds for limit buy" });
+    }
+  }
+
+  // For sell order: ensure user owns enough quantity
+  if (orderSide === 'sell') {
+    const holding = user.stock_holdings.find(h => h.stock_symbol === ticker);
+    if (!holding || holding.quantity < quantity) {
+      return res.status(400).json({ message: "Not enough stock to sell" });
+    }
+  }
+
+  await Order.create({
+    userId: user._id,
+    ticker,
+    quantity,
+    price:limitPrice,
+    type: orderSide,
+    orderType: 'limit'
+  });
+
+  return res.status(202).json({ message: `Limit ${orderSide} order queued successfully` });
+});
+
+
+const getPendingOrders = asyncHandler(async (req, res) => {
+  const email = req.user.email;
+  const user = await User.findOne({ email });
+  if (!user) return res.status(404).json({ message: 'User not found' });
+
+  const pendingOrders = await Order.find({
+    userId: user._id,
+    status: 'pending'
+  });
+
+  res.status(200).json(pendingOrders);
+});
+
 module.exports = {
   Sign_up,
   Sign_in,
@@ -259,5 +409,9 @@ module.exports = {
   updatePortfolio,
   resetPortfolio,
   pendingOrders,
-  getStockData
+  getStockData,
+  placeBuyOrder,
+  placeSellOrder,
+  placeLimitOrder,
+  getPendingOrders
 };

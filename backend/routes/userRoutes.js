@@ -8,7 +8,11 @@ const {
   updatePortfolio,
   resetPortfolio,
   pendingOrders,
-  getStockData
+  getStockData,
+  placeBuyOrder,
+  placeSellOrder,
+  placeLimitOrder,
+  getPendingOrders
 } = require("../controllers/userController"); // Ensure 'Sign_out' is included
 
 const { authMiddleware } = require("../middlewares/authMiddleware"); // Use the destructured import
@@ -21,4 +25,8 @@ router.route("/update-portfolio").put(updatePortfolio);
 router.route("/reset-portfolio").put(resetPortfolio);
 router.route("/pending-orders").get(authMiddleware, pendingOrders);
 router.route("/getStockData").get(getStockData);
+router.route("/placeBuyOrder").post(authMiddleware,placeBuyOrder);
+router.route("/placeSellOrder").post(authMiddleware,placeSellOrder);
+router.route("/placeLimitOrder").post(authMiddleware,placeLimitOrder);
+router.route("/getPendingOrders").get(authMiddleware,getPendingOrders)
 module.exports = router;

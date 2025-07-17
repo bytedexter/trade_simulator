@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const User = require('./models/user'); // Adjust the path as necessary
 const connectDb = require('./config/db'); // Adjust the path as necessary
+const executePendingOrders = require('./utils/executePendingOrders');
 
 
 const app = express();
@@ -43,6 +44,14 @@ app.use("/api/users", require("./routes/userRoutes")); // Adjust the path as nec
 app.get("/api", (req, res) => {
   res.send("Welcome to the TradePro Backend");
 });
+
+
+//utility
+setInterval(() => {
+  console.log('🔁 Checking pending limit orders...');
+  executePendingOrders();
+}, 60 * 1000); // Run every 1 minute
+
 
 // Start server
 app.listen(PORT, () => {
